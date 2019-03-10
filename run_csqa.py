@@ -41,25 +41,21 @@ logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(messa
 logger = logging.getLogger(__name__)
 
 
-class SwagExample(object):
-    """A single training/test example for the SWAG dataset."""
+class CSQAExample(object):
+    """A single training/test example for the CSQA dataset."""
     def __init__(self,
-                 swag_id,
-                 context_sentence,
-                 start_ending,
-                 ending_0,
-                 ending_1,
-                 ending_2,
-                 ending_3,
+                 csqa_id,
+                 question,
+                 choice_0,
+                 choice_1,
+                 choice_2,
                  label = None):
-        self.swag_id = swag_id
-        self.context_sentence = context_sentence
-        self.start_ending = start_ending
-        self.endings = [
-            ending_0,
-            ending_1,
-            ending_2,
-            ending_3,
+        self.csqa_id = csqa_id
+        self.question = question
+        self.choices = [
+            choice_0,
+            choice_1,
+            choice_2,
         ]
         self.label = label
 
@@ -68,13 +64,11 @@ class SwagExample(object):
 
     def __repr__(self):
         l = [
-            "swag_id: {}".format(self.swag_id),
-            "context_sentence: {}".format(self.context_sentence),
-            "start_ending: {}".format(self.start_ending),
-            "ending_0: {}".format(self.endings[0]),
-            "ending_1: {}".format(self.endings[1]),
-            "ending_2: {}".format(self.endings[2]),
-            "ending_3: {}".format(self.endings[3]),
+            "csqa_id: {}".format(self.csqa_id),
+            "question: {}".format(self.question),
+            "choice_0: {}".format(self.choices[0]),
+            "choice_1: {}".format(self.choices[1]),
+            "choice_2: {}".format(self.choices[2])
         ]
 
         if self.label is not None:
@@ -102,7 +96,7 @@ class InputFeatures(object):
         self.label = label
 
 
-def read_swag_examples(input_file, is_training):
+def read_csqa_examples(input_file, is_training):
     with open(input_file, 'r', encoding='utf-8') as f:
         reader = csv.reader(f)
         lines = []
@@ -117,17 +111,14 @@ def read_swag_examples(input_file, is_training):
         )
 
     examples = [
-        SwagExample(
-            swag_id = line[2],
-            context_sentence = line[4],
-            start_ending = line[5], # in the swag dataset, the
-                                         # common beginning of each
-                                         # choice is stored in "sent2".
-            ending_0 = line[7],
-            ending_1 = line[8],
-            ending_2 = line[9],
-            ending_3 = line[10],
-            label = int(line[11]) if is_training else None
+        CSQAExample(
+            csqa_id = line[1],
+            question = line[3],
+
+            choice_0 = line[4],
+            choice_1 = line[5],
+            choice_2 = line[6],
+            label = int(line[7]) if is_training else None
         ) for line in lines[1:] # we skip the line with the column names
     ]
 
@@ -149,29 +140,27 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
     # - [CLS] context [SEP] choice_1 [SEP]
     # - [CLS] context [SEP] choice_2 [SEP]
     # - [CLS] context [SEP] choice_3 [SEP]
-    # - [CLS] context [SEP] choice_4 [SEP]
     # The model will output a single value for each input. To get the
     # final decision of the model, we will run a softmax over these 4
     # outputs.
     features = []
     for example_index, example in enumerate(examples):
-        context_tokens = tokenizer.tokenize(example.context_sentence)
-        start_ending_tokens = tokenizer.tokenize(example.start_ending)
+        context_tokens = tokenizer.tokenize(example.question)
 
         choices_features = []
-        for ending_index, ending in enumerate(example.endings):
+        for choice_index, choice in enumerate(example.choices):
             # We create a copy of the context tokens in order to be
-            # able to shrink it according to ending_tokens
+            # able to shrink it according to choice_tokens
             context_tokens_choice = context_tokens[:]
-            ending_tokens = start_ending_tokens + tokenizer.tokenize(ending)
-            # Modifies `context_tokens_choice` and `ending_tokens` in
+            choice_tokens = tokenizer.tokenize(choice)
+            # Modifies `context_tokens_choice` and `choice_tokens` in
             # place so that the total length is less than the
             # specified length.  Account for [CLS], [SEP], [SEP] with
             # "- 3"
-            _truncate_seq_pair(context_tokens_choice, ending_tokens, max_seq_length - 3)
+            _truncate_seq_pair(context_tokens_choice, choice_tokens, max_seq_length - 3)
 
-            tokens = ["[CLS]"] + context_tokens_choice + ["[SEP]"] + ending_tokens + ["[SEP]"]
-            segment_ids = [0] * (len(context_tokens_choice) + 2) + [1] * (len(ending_tokens) + 1)
+            tokens = ["[CLS]"] + context_tokens_choice + ["[SEP]"] + choice_tokens + ["[SEP]"]
+            segment_ids = [0] * (len(context_tokens_choice) + 2) + [1] * (len(choice_tokens) + 1)
 
             input_ids = tokenizer.convert_tokens_to_ids(tokens)
             input_mask = [1] * len(input_ids)
@@ -191,7 +180,7 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
         label = example.label
         if example_index < 5:
             logger.info("*** Example ***")
-            logger.info("swag_id: {}".format(example.swag_id))
+            logger.info("csqa_id: {}".format(example.csqa_id))
             for choice_idx, (tokens, input_ids, input_mask, segment_ids) in enumerate(choices_features):
                 logger.info("choice: {}".format(choice_idx))
                 logger.info("tokens: {}".format(' '.join(tokens)))
@@ -203,7 +192,7 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
 
         features.append(
             InputFeatures(
-                example_id = example.swag_id,
+                example_id = example.csqa_id,
                 choices_features = choices_features,
                 label = label
             )
@@ -359,7 +348,7 @@ def main():
     train_examples = None
     num_train_optimization_steps = None
     if args.do_train:
-        train_examples = read_swag_examples(os.path.join(args.data_dir, 'train.csv'), is_training = True)
+        train_examples = read_csqa_examples(os.path.join(args.data_dir, 'train.csv'), is_training = True)
         num_train_optimization_steps = int(
             len(train_examples) / args.train_batch_size / args.gradient_accumulation_steps) * args.num_train_epochs
         if args.local_rank != -1:
@@ -368,7 +357,7 @@ def main():
     # Prepare model
     model = BertForMultipleChoice.from_pretrained(args.bert_model,
         cache_dir=os.path.join(str(PYTORCH_PRETRAINED_BERT_CACHE), 'distributed_{}'.format(args.local_rank)),
-        num_choices=4)
+        num_choices=3)
     if args.fp16:
         model.half()
     model.to(device)
@@ -481,15 +470,15 @@ def main():
 
         # Load a trained model and config that you have fine-tuned
         config = BertConfig(output_config_file)
-        model = BertForMultipleChoice(config, num_choices=4)
+        model = BertForMultipleChoice(config, num_choices=3)
         model.load_state_dict(torch.load(output_model_file))
     else:
-        model = BertForMultipleChoice.from_pretrained(args.bert_model, num_choices=4)
+        model = BertForMultipleChoice.from_pretrained(args.bert_model, num_choices=3)
     model.to(device)
 
 
     if args.do_eval and (args.local_rank == -1 or torch.distributed.get_rank() == 0):
-        eval_examples = read_swag_examples(os.path.join(args.data_dir, 'val.csv'), is_training = True)
+        eval_examples = read_csqa_examples(os.path.join(args.data_dir, 'val.csv'), is_training = True)
         eval_features = convert_examples_to_features(
             eval_examples, tokenizer, args.max_seq_length, True)
         logger.info("***** Running evaluation *****")
