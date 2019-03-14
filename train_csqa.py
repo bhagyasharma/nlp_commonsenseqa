@@ -140,18 +140,13 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
                                  is_training):
     """Loads a data file into a list of `InputBatch`s."""
 
-    # Swag is a multiple choice task. To perform this task using Bert,
-    # we will use the formatting proposed in "Improving Language
-    # Understanding by Generative Pre-Training" and suggested by
-    # @jacobdevlin-google in this issue
-    # https://github.com/google-research/bert/issues/38.
-    #
+    # Use this formatting for tokenization
     # Each choice will be tokenized accordingly:
     # - [CLS] question [SEP] choice_1 [SEP]
     # - [CLS] question [SEP] choice_2 [SEP]
     # - [CLS] question [SEP] choice_3 [SEP]
     # The model will output a single value for each input. To get the
-    # final decision of the model, we will run a softmax over these 4
+    # final decision of the model, we will run a softmax over these 3
     # outputs.
     features = []
     for example_index, example in enumerate(examples):
