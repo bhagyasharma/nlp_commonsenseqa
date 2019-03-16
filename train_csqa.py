@@ -1,5 +1,7 @@
 # coding=utf-8
 # Code leveraged from https://github.com/huggingface/pytorch-pretrained-BERT
+# this script is meant to train CSQA on BERT only, to run this script or to 
+# get model accuracy on validation or test files, use evaluate_results_bert_csqa.ipynb
 
 import argparse
 import csv
